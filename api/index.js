@@ -8,6 +8,7 @@ require('dotenv').config();
 const serverless = require('serverless-http');
 const rateLimit = require('express-rate-limit');
 const adminAuth = require('../middlewares/adminAuth');
+const { sendOrderReceiptEmail, normalizeEmail, isValidEmail } = require('./email/mailer');
 
 const app = express();
 app.set('trust proxy', 1);
