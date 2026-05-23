@@ -469,11 +469,18 @@
 
     // ─── UPDATE STATUS ─────────────────────────────────────────────────────────────
     async function updateStatus(orderId, status) {
+      let payload = { status };
+      if (status === 'cancelled') {
+        const reason = prompt('Optional: Enter cancellation reason for this order:');
+        if (reason !== null && reason.trim() !== '') {
+          payload.cancellation_reason = reason.trim();
+        }
+      }
       try {
         await authFetch(`${API}/orders/${orderId}/status`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status })
+          body: JSON.stringify(payload)
         });
         showToast(`Status updated to "${status}"`);
         loadOrders();
@@ -485,11 +492,18 @@
     // ─── CANCEL ORDER ─────────────────────────────────────────────────────────────
     async function cancelOrder(orderId) {
       if (!confirm(`Are you sure you want to cancel order ${orderId}?`)) return;
+      
+      const reason = prompt('Optional: Enter cancellation reason for this order:');
+      let payload = { status: 'cancelled' };
+      if (reason !== null && reason.trim() !== '') {
+        payload.cancellation_reason = reason.trim();
+      }
+
       try {
         const res = await authFetch(`${API}/orders/${orderId}/status`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: 'cancelled' })
+          body: JSON.stringify(payload)
         });
         const data = await res.json();
         if (data.success) {
@@ -520,6 +534,7 @@
       <div class="info-item" style="grid-column:span 2"><label>Delivery Address</label><span>${order.address}, ${order.city} - ${order.pincode}</span></div>
       <div class="info-item"><label>Payment</label><span class="status-pill ${order.payment_status === 'paid' ? 'pay-paid' : 'pay-unpaid'}" style="font-size:12px">${order.payment_status === 'paid' ? '✅ Paid' : '⏳ Unpaid'}</span></div>
       <div class="info-item"><label>Order Status</label><span>${order.status}</span></div>
+      ${order.status === 'cancelled' && order.cancellation_reason ? `<div class="info-item" style="grid-column:span 2"><label>Cancellation Reason</label><span style="color: #d32f2f;">${order.cancellation_reason}</span></div>` : ''}
       ${order.confirmed_at ? `<div class="info-item" style="grid-column:span 2"><label>Confirmed At</label><span>${new Date(order.confirmed_at).toLocaleString('en-IN')}</span></div>` : ''}
     </div>
     <div class="items-list">

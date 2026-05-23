@@ -107,6 +107,7 @@ const orderSchema = new mongoose.Schema({
   status: { type: String, enum: ['pending', 'confirmed', 'preparing', 'delivered', 'cancelled'], default: 'pending' },
   payment_status: { type: String, enum: ['unpaid', 'paid'], default: 'unpaid' },
   notes: { type: String, default: '' },
+  cancellation_reason: { type: String, default: '' },
   confirmed_at: { type: Date, default: null },
 }, { timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' } });
 
@@ -621,23 +622,63 @@ app.patch('/api/orders/:orderId/confirm-payment', adminAuth, async (req, res) =>
 // Update order status
 app.patch('/api/orders/:orderId/status', adminAuth, async (req, res) => {
   try {
-    const { status } = req.body;
+    const { status, cancellation_reason } = req.body;
 
     if (!isDbReady()) {
       const order = memoryOrders.find((o) => o.order_id === req.params.orderId);
       if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
       order.status = status;
+      if (cancellation_reason !== undefined) order.cancellation_reason = cancellation_reason;
       order.updated_at = new Date();
       return res.json({ success: true });
     }
 
+    const updateData = { status };
+    if (cancellation_reason !== undefined) updateData.cancellation_reason = cancellation_reason;
+
     const order = await Order.findOneAndUpdate(
       { order_id: req.params.orderId },
-      { status },
+      updateData,
       { new: true }
     );
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Cancel order (customer)
+app.post('/api/orders/:orderId/cancel', async (req, res) => {
+  try {
+    const { reason } = req.body;
+
+    if (!isDbReady()) {
+      const order = memoryOrders.find((o) => o.order_id === req.params.orderId);
+      if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+      
+      if (['delivered', 'cancelled'].includes(order.status)) {
+        return res.status(400).json({ success: false, message: `Cannot cancel an order that is already ${order.status}` });
+      }
+
+      order.status = 'cancelled';
+      order.cancellation_reason = reason || 'Cancelled by customer';
+      order.updated_at = new Date();
+      return res.json({ success: true, message: 'Order cancelled successfully' });
+    }
+
+    const order = await Order.findOne({ order_id: req.params.orderId });
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    if (['delivered', 'cancelled'].includes(order.status)) {
+      return res.status(400).json({ success: false, message: `Cannot cancel an order that is already ${order.status}` });
+    }
+
+    order.status = 'cancelled';
+    order.cancellation_reason = reason || 'Cancelled by customer';
+    await order.save();
+
+    res.json({ success: true, message: 'Order cancelled successfully' });
   } catch (err) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
@@ -695,15 +736,9 @@ app.get('/', (req, res) => {
 });
 
 // ─── START ─────────────────────────────────────────────────────────────────────
-if (require.main === module) {
-  if (!MONGO_URI) {
-    console.warn('⚠️  MONGO_URI is not set. Orders and products API run in memory/static mode until you restart the server.');
-  }
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running at http://localhost:${PORT}`);
 function startServer(port) {
   const server = app.listen(port, () => {
-    console.log(`Server running at http://localhost:${port}`);
+    console.log(`🚀 Server running at http://localhost:${port}`);
   });
 
   server.on('error', (err) => {
@@ -720,6 +755,9 @@ function startServer(port) {
 }
 
 if (require.main === module) {
+  if (!MONGO_URI) {
+    console.warn('⚠️  MONGO_URI is not set. Orders and products API run in memory/static mode until you restart the server.');
+  }
   startServer(Number(PORT));
 }
 

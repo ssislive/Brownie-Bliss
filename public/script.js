@@ -978,6 +978,11 @@ function renderOrderDetails(order) {
         if (statusLower === 'cancelled') {
             timeline.style.display = 'none';
             cancelledAlert.style.display = 'block';
+            
+            const cancelReasonDisplay = document.getElementById('cancelReasonDisplay');
+            if (cancelReasonDisplay) {
+                cancelReasonDisplay.textContent = order.cancellation_reason ? `Reason: ${order.cancellation_reason}` : '';
+            }
         } else {
             timeline.style.display = 'block';
             cancelledAlert.style.display = 'none';
@@ -1030,7 +1035,58 @@ function renderOrderDetails(order) {
     document.getElementById('resItems').innerHTML = itemsHtml;
     document.getElementById('resTotal').textContent = order.total;
 
+    // Handle cancel section
+    const cancelSection = document.getElementById('cancelOrderSection');
+    if (cancelSection) {
+        if (['pending', 'confirmed', 'preparing'].includes(statusLower)) {
+            cancelSection.style.display = 'block';
+            document.getElementById('cancelOrderBtn').style.display = 'inline-block';
+            document.getElementById('cancelPrompt').style.display = 'none';
+        } else {
+            cancelSection.style.display = 'none';
+        }
+    }
+
     document.getElementById('result').style.display = 'block';
+}
+
+function promptCancelOrder() {
+    document.getElementById('cancelOrderBtn').style.display = 'none';
+    document.getElementById('cancelPrompt').style.display = 'block';
+}
+
+function abortCancelOrder() {
+    document.getElementById('cancelOrderBtn').style.display = 'inline-block';
+    document.getElementById('cancelPrompt').style.display = 'none';
+    document.getElementById('cancelReasonInput').value = '';
+}
+
+async function confirmCancelOrder() {
+    const orderId = document.getElementById('resOrderId').textContent;
+    const reason = document.getElementById('cancelReasonInput').value.trim();
+    const btn = document.querySelector('#cancelPrompt button:last-child');
+    
+    if (btn) btn.disabled = true;
+    
+    try {
+        const res = await fetch(`${API_BASE}/orders/${orderId}/cancel`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reason })
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+            showToast('Order cancelled successfully.');
+            trackOrder(orderId); // Refresh details
+        } else {
+            showToast(data.message || 'Failed to cancel order.');
+        }
+    } catch (e) {
+        showToast('Server error while cancelling order.');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
 }
 function toggleMenu(){
   document
