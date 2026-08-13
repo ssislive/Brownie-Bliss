@@ -19,8 +19,12 @@
     <link rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 
+    <!-- LEAFLET (free, no API key — powers the live tracking map) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+
     <!-- CSS -->
     <link rel="stylesheet" href="track.css">
+    <link rel="stylesheet" href="track-live.css">
 
 </head>
 
@@ -177,6 +181,18 @@
 
             </div>
 
+            <!-- DELIVERY ADDRESS / AREA (used to plot the live route) -->
+            <div class="premium-input-box">
+
+                <i class="fa-solid fa-location-dot"></i>
+
+                <input
+                    type="text"
+                    id="deliveryArea"
+                    placeholder="Delivery Area (e.g. Krishnagiri, Tamil Nadu) — optional">
+
+            </div>
+
             <!-- BUTTON -->
             <button
                 class="track-order-btn"
@@ -195,6 +211,56 @@
             <div class="secure-text">
 
                 🔒 Your order details are safe & secure
+
+            </div>
+
+        </div>
+
+        <!-- LIVE TRACKING PANEL (shown once an order is found) -->
+        <div class="live-tracking-panel" id="liveTrackingPanel">
+
+            <div class="live-panel-header">
+
+                <h3>Live Delivery Tracking</h3>
+
+                <span class="live-badge" id="liveStatusBadge">Live</span>
+
+            </div>
+
+            <div id="liveMap"></div>
+
+            <div class="live-stats">
+
+                <div class="live-stat-box">
+
+                    <span>Estimated Arrival</span>
+
+                    <strong id="liveEta">—</strong>
+
+                </div>
+
+                <div class="live-stat-box">
+
+                    <span>Distance Remaining</span>
+
+                    <strong id="liveDistance">—</strong>
+
+                </div>
+
+            </div>
+
+            <div class="live-progress-track">
+
+                <div class="live-progress-fill" id="liveProgressFill"></div>
+
+            </div>
+
+            <div class="live-stages">
+
+                <div class="live-stage">Order Placed</div>
+                <div class="live-stage">Out for Delivery</div>
+                <div class="live-stage">Nearby</div>
+                <div class="live-stage">Delivered</div>
 
             </div>
 
@@ -371,6 +437,11 @@
 
     </footer>
 
+    <!-- LEAFLET JS (free, no API key) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <!-- LIVE TRACKING MODULE -->
+    <script src="track-live.js"></script>
+
     <!-- SCRIPT -->
     <script>
 
@@ -384,6 +455,9 @@ function trackOrder(){
 
     const phone =
     document.getElementById("phoneNumber").value.trim();
+
+    const deliveryArea =
+    document.getElementById("deliveryArea").value.trim();
 
     const result =
     document.getElementById("track-result");
@@ -417,6 +491,8 @@ function trackOrder(){
 
         `;
 
+        hideLiveTracking();
+
         return;
 
     }
@@ -442,6 +518,8 @@ function trackOrder(){
 
         `;
 
+        hideLiveTracking();
+
         return;
 
     }
@@ -462,6 +540,8 @@ function trackOrder(){
 
         `;
 
+        hideLiveTracking();
+
         return;
 
     }
@@ -481,6 +561,8 @@ function trackOrder(){
         </div>
 
         `;
+
+        hideLiveTracking();
 
         return;
 
@@ -512,6 +594,8 @@ function trackOrder(){
 
         `;
 
+        showLiveTracking(deliveryArea);
+
     }
 
     else{
@@ -530,7 +614,41 @@ function trackOrder(){
 
         `;
 
+        hideLiveTracking();
+
     }
+
+}
+
+function showLiveTracking(deliveryArea){
+
+    const panel = document.getElementById("liveTrackingPanel");
+
+    panel.classList.add("live-visible");
+
+    // Reset badge in case a previous tracking session finished
+    const badge = document.getElementById("liveStatusBadge");
+    badge.textContent = "Live";
+    badge.classList.remove("live-badge-delivered");
+
+    // Leaflet needs the container visible before it initializes,
+    // so kick this off right after we un-hide the panel.
+    BrownieTracking.start({
+        containerId: "liveMap",
+        customerQuery: deliveryArea || "Krishnagiri, Tamil Nadu"
+    });
+
+    panel.scrollIntoView({ behavior: "smooth", block: "nearest" });
+
+}
+
+function hideLiveTracking(){
+
+    const panel = document.getElementById("liveTrackingPanel");
+
+    panel.classList.remove("live-visible");
+
+    BrownieTracking.stop();
 
 }
 
